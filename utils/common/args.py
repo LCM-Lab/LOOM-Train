@@ -1,123 +1,183 @@
-import argparse
-import builtins
-from typing import Any, List, Literal
+import argparse, os
+from loomtrain.utils.common.iotools import dirname
+
+def add_saving_arguments(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title = "Saving Config")
+    group.add_argument(
+        "--data-cache-dir", type = str, default = f"{dirname(dirname(dirname(os.path.abspath(__file__))))}/examples/datasetfiles",
+        help = "Data cache directory."
+    )
+    group.add_argument(
+        "--save-dir", type = str, default = f"{dirname(dirname(dirname(os.path.abspath(__file__))))}/examples/",
+        help = "The ckpt and weights saving directory."
+    )
+    group.add_argument(
+        "--save-name", type = str, default = None, required = True,
+        help = "The ckpt and weights saving name."
+    )
+    return parser
 
 
-class Arg:
-    def __init__(
-            self, 
-            name: str = None,
-            short: str = None,
-            type: type = None,
-            action: Literal["store", "store_true", "store_false", "store_const", "count", "append"] = "store",
-            default: Any = None,
-            islist: bool = False,
-            help: str = None,
-            **kwargs
-    ):        
-
-        if name is None:
-            assert len(kwargs) == 1
-            name = next(iter(kwargs.keys()))
-        
-        if len(kwargs) == 1 and (action != "store_const"):
-           assert name in kwargs, "You should either use `name` or default args! Not simultaneously!"
-           default = kwargs[name]
-
-        if type is None:
-            if isinstance(default, builtins.type):
-                type = default
-                default = None
-            else: type = builtins.type(default)
-
-            
-
-        self.list = [f"--{name.strip('_')}"]
-        if short is not None:
-            self.list += [f"-{short.strip('_')}"]
-        assert type != None, "You passed a 'None' type and you didn't pass any default args"
-        self.dict = dict()
-
-        if action == "store":
-            self.dict["type"] = type
-        
-
-        if default is not None:
-            self.dict["default"] = type(default)
-
-        if action != "store":
-            self.dict["action"] =action
-
-        if action == "store_const":
-            dest, const = next(iter(kwargs.items()))
-            self.dict.update(dict(
-                dest = dest.strip('_'),
-                const = const
-            ))
+def add_model_arguments(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title = "Model Config")
+    group.add_argument(
+        "--model-path", type = str, required = True,
+        help = "Huggingface Model Name"
+    )
+    return parser    
 
 
-        if help is not None:
-            self.dict["help"] = help
- 
-        if islist:
-            assert type
-            self.dict["nargs"] = "*"
-
-class StoreArgs:
-    def __init__(self, **kwargs):
-        self.args = [
-            Arg(**{f"_{k}": v}) for k, v  in kwargs.items()
-        ]
-
-
-class AutoParser:
-    def __init__(self,
-                 args: List[Arg]):
-
-        self.parser = argparse.ArgumentParser()
-
-        for arg in args:
-            if isinstance(arg, Arg):
-                self.parser.add_argument(*arg.list, **arg.dict)
-            else:
-                for a in arg.args:
-                    self.parser.add_argument(*a.list, **a.dict)
-
-    def parse_args(self):
-        return self.parser.parse_args()
+def add_data_arguments(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title = "Data Config")
+    group.add_argument(
+        "--dataset-paths", type = str, nargs = "+", required = True,
+        help = "A series formatted Dataset paths. For more detailed about the format, see xxx."
+    )
+    group.add_argument(
+        "--sample-ratios", type = float, nargs = "+", default = None,
+        help = "xxx."
+    )
+    group.add_argument(
+        "--sample-counts", type = int, nargs = "+", required = True,
+        help = "xxx."
+    )
+    group.add_argument(
+        "--sample-counts-eval", type = int, nargs = "+", required = True,
+        help = "xxx."
+    )
+    group.add_argument(
+        "--max-data-length", type = int, default = 128000,
+        help = "Upper Bound of the length of the training data, those excess this will be filterd out."
+    )
+    group.add_argument(
+        "--max-packing-length", type = int, default = 128000,
+        help = "Upper Bound of the packing length."
+    )
+    return parser    
 
 
-if __name__ =="__main__":
-    # args = AutoParser([
-    #     Arg(haha = 1.),
-    #     # Arg(name = "wtf", action = "store_false"),
 
-    # ]).parse_args()
+def add_training_arguments(parser: argparse.ArgumentParser):
 
-    # # print(args.eval)
-    # print(args.haha, type(args.haha))
-    # print(args.
+    group = parser.add_argument_group(title = "Training Config")
+    
+    group.add_argument(
+        "--seed", type = int, default = 42
+    )
+    group.add_argument(
+        "--do-resume", type = bool, default = True
+    )
+    group.add_argument(
+        "--max-epochs", type = int, default = 1,
+        help = "Maximum Training Epochs"
+    )
+    group.add_argument(
+        "--learning-rate", type = float, default = 2e-6
+    )
+
+    group.add_argument(
+        "--ckpt-save-interval", type = int, default = 20,
+        help = "Checkpoint saving interval, used for resuming."
+    )
+    group.add_argument(
+        "--weights-save-interval", type = int, default = 20,
+        help = "Weight saving interval, used for evaluating."
+    )
+    group.add_argument(
+        "--max-ckpts", type = int, default = 2,
+        help = "Maximum Checkpoints retained. Delete the oldest one upon excessing."
+    )
+
+    group.add_argument(
+        "--max-weights", type = int, default = 10,
+        help = "Maximum Weights retained. Delete the oldest one upon excessing."
+    )
+    group.add_argument(
+        "--evaluate-interval", type = int, default = 20,
+        help = "Checkpoint saving interval, used for resuming."
+    )
+    group.add_argument(
+        "--lr-warmup-ratio", type = float, default = 0.03,
+        help = "Default lr scheduler is cosine annealing. This argument refers to the proportion of the entire training steps during which the LR linear growth reaches its peak."    
+    )
+    group.add_argument(
+        "--adam-betas", type = float, nargs = 2, default = (0.9, 0.95)
+    )
+
+    group.add_argument(
+        "--L2-weight-decay", type = float, default = 0.0
+    )
+
+    group = add_strategy_arguemnts_group(group)
+    group = add_visualization_arguments_group(group)
+
+    return parser
 
 
-    args = AutoParser([
-        StoreArgs(
-            micro_train_batch_size = 8,
-            train_batch_size = 128,
-            max_norm = 1.0,
-            seed = 42,
-            enable_bf16 = True,
-            zpg = 1,
-            overlap_comm = True,
-            max_epochs = 2,
-            learning_rate = 5e-6,
-            lr_warmup_ratio = 0.03,
-            l2 = 0,
-            adam_betas = (0.9, 0.95),
-            ring_attn_size = 4,
-            ring_head_stride = 1,
 
-        )
 
-    ]).parse_args()
 
-    print(args.train_batch_size)
+def add_strategy_arguemnts_group(group: argparse._ArgumentGroup):
+    subgroup = group.add_argument_group(title = "Strategy Config")
+
+    subgroup.add_argument(
+        "--micro-batch-size", type = int, default = 1,
+        help = "Micro Batch Size."
+    )
+    subgroup.add_argument(
+        "--global-batch-size", type = int, default = 16,
+        help = "Global Batch Size. Grad Accumulation will be automatically computed by `gloabl//micro`."
+    )
+
+    subgroup.add_argument(
+        "--zero-stage", type = int, default = 2, choices = [2, 3],
+        help = "DeepSpeed Zero Stage."
+    )
+    subgroup.add_argument(
+        "--enable-bf16", type = bool, default = True,
+        help = "Whether to use bf16. Otherwise fp16."
+    )    
+    subgroup.add_argument(
+        "--grad-clip", type = float, default = 1.,
+        help = "Grad Clipping after backward."
+    )
+    subgroup.add_argument(
+        "--zpg", type = int, default = 1,
+        help = "."
+    )
+    subgroup.add_argument(
+        "--overlap-comm", type = bool, default = False,
+    )
+
+    subgroup = group.add_argument_group(title = "Context Parallel Config")
+    subgroup.add_argument(
+        "--ring-attn-size", type = int, default = 8
+    )
+    subgroup.add_argument(
+        "--ring-head-stride", type = int, default = 4
+    )
+    return group
+
+
+def add_visualization_arguments_group(group: argparse._ArgumentGroup):
+    subgroup = group.add_argument_group(title = "Visulization Config")
+    subgroup.add_argument(
+        "--tensorboard-logdir", type = str, required = True
+    )
+    subgroup.add_argument(
+        "--wandb-api", type = str, default = None
+    )
+    subgroup.add_argument(
+        "--wandb-entity", type = str, default = None,
+    )
+    subgroup.add_argument(
+        "--wandb-project", type = str, default = None,
+    )
+    subgroup.add_argument(
+        "--wandb-name", type = str, default = None,
+    )
+    subgroup.add_argument(
+        "--wandb-group", type = str, default = None,
+    )
+    return group
+

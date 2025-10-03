@@ -29,4 +29,5 @@ train/trainer/base_release.py
 utils/scheduling/cli/queueing.py
 utils/scheduling/cli/takeover.py
 train/dataset/pretrain.py
+Loom_Train.egg-info
 

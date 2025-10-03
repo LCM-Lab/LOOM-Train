@@ -507,7 +507,6 @@ class SimPOBradleyTerryRMTrainer(Trainer):
 
         self.loss_fn = BradleyTerryLoss()
 
-    @Scheduler.monitored(group_name = "train")
     def fit(self, load_ckpt: bool = True):
         states = self.load_ckpt(load_ckpt = load_ckpt)
         step, update_steps_per_epoch, start_epoch, consumed_samples, total_tokens, loss_tokens = \

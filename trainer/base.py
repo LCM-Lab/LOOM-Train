@@ -78,6 +78,9 @@ class TrainerConfig:
     def lr_warmup_steps(self, train_dataloader: tud.DataLoader):
         return math.ceil(self.lr_warmup_ratio * self.max_steps(train_dataloader))
 
+    def __post_init__(self):
+        if not self.bucket_size:
+            self.bucket_size = None
 
 
 
