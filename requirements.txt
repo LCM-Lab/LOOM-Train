@@ -1,0 +1,40 @@
+#general
+psutil
+pyyaml
+pandas
+tqdm
+gpustat
+nvitop
+modelscope # load personal dataset     
+addict     # modelscope required
+tabulate
+
+# llm eval
+# transformers==4.46.1 #stable
+transformers==4.51.1
+peft              # lora
+# flash-attn
+# vllm==0.6.4.post1 # To run Deepseek-V3, one need vllm>=0.6.6 (based on glibc >= 2.27)
+vllm==0.8.3
+openai                # for api calling
+datasets
+accelerate
+
+nltk                  #babilong
+seaborn               #babilong
+
+tenacity              #RULER  useless
+wonderwords           #RULER
+nemo_toolkit[common]  #RULER
+
+rouge                 #LongBench
+jieba                 #LongBench
+fuzzywuzzy            #LongBench
+python-Levenshtein
+
+
+
+
+#llm train
+deepspeed
+wandb
