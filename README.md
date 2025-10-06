@@ -1,11 +1,11 @@
-# Long Context Factory
+# Loom-Train
 ## 💻 Environment & Installation
 
-To install the`lcf` package from the gitee repository, run:
+To install the`loomtrain` package from the gitee repository, run:
 
 ```bash
-git clone https://gitee.com/iiGray/lcf.git
-cd lcf
+git clone https://github.com/iiGray/loomtrain.git
+cd loomtrain
 conda create -n lcf python=3.10 -y
 conda activate lcf
 pip install -e .
