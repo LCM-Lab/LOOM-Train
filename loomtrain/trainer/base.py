@@ -49,6 +49,8 @@ class TrainerConfig:
                        "cosine_with_min_lr",
                        "warmup_stable_decay"] = "cosine_with_min_lr"
     learing_rate: float = 5e-6
+    adam_betas: tuple = (0.9, 0.95)
+    adam_weight_decay: float = 0.0
     lr_warmup_ratio: float = 0.03
 
     eval_steps: int = 1
