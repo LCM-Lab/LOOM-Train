@@ -37,7 +37,7 @@ def set_cu_seqlens_for_ring_attn(
     ring_attn_rank = dist.get_rank(group = ring_attn_group)
     ring_attn_size = dist.get_world_size(group = ring_attn_group)
     total_seq_len = packed_sequences.size(0) * packed_sequences.size(1)
-    assert total_seq_len % ring_attn_size == 0
+    assert total_seq_len % ring_attn_size == 0, f"Packed Sequences shape: {packed_sequences.size()}"
     local_seq_len = total_seq_len // ring_attn_size
     start, end = ring_attn_rank * local_seq_len, (ring_attn_rank + 1) * local_seq_len
     sequences = packed_sequences[:, start: end]
