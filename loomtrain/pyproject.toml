@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "Loom-Train"
 version = "0.1.0"
-description = "A library for training large long context models."
+description = "A Simple & Efficient Training Framework for Long-Context LLMs."
 authors = [
     { name="iiGray", email="iiiigray19@gmail.com" }
 ]
@@ -15,42 +15,36 @@ requires-python = ">=3.10"
 
 
 dependencies = [
-    #general
     "psutil",
     "pyyaml",
     "pandas",
     "tqdm",
     "gpustat",
     "nvitop",
-    "modelscope", # load personal dataset     
-    "addict",     # modelscope required
+    "modelscope",     
+    "addict",
     "tabulate",
 
-
-    # llm eval
-    # transformers==4.46.1 #stable
     "transformers==4.51.1",
     "peft",              # lora
-    # flash-attn
-    # vllm==0.6.4.post1 # To run Deepseek-V3, one need vllm>=0.6.6 (based on glibc >= 2.27)
-    # "vllm==0.8.3",
-    "openai",                # for api calling
+    # flash-attn,
+    "openai",
     "datasets",
     "accelerate",
 
-    "nltk",                  #babilong
-    "seaborn",               #babilong
+    "nltk",
+    "seaborn",
 
-    "tenacity",              #RULER  useless
-    "wonderwords",           #RULER
-    "nemo_toolkit[common]",  #RULER
+    "tenacity",
+    "wonderwords",
+    "nemo_toolkit[common]",
 
-    "rouge",                 #LongBench
-    "jieba",                 #LongBench
-    "fuzzywuzzy",            #LongBench
+    "rouge",
+    "jieba",
+    "fuzzywuzzy",      
     "python-Levenshtein",
 
-    "fastchat",              #reward-bench
+    "fastchat",
 
 
     #llm train
