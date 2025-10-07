@@ -35,12 +35,11 @@ def deepspeed_train_config(
         stage3_max_live_parameters = "auto", 
         stage3_max_reuse_distance = "auto",
         stage3_param_persistence_threshold = "auto",
-        stage3_prefetch_bucket_size = "auto", # 参数是从 CPU/GPU/offload 的设备中异步加载到计算设备的, 太大内存压力大，太小通讯效率低
-        reduce_bucket_size = "auto", #在梯度反向传播时，触发分布式梯度通信（all-reduce）的最小单位大小
-        # ZeRO++
-        zero_hpz_partition_size = zpg, # 模型的权重会按多大“分区块大小”去切分后放入不同的 GPU/CPU
-        zero_quantized_weights = False, # 是否启用 权重量化（Quantization）来节省显存
-        zero_quantized_gradients = False, # 是否对 梯度进行量化
+        stage3_prefetch_bucket_size = "auto",
+        reduce_bucket_size = "auto", 
+        zero_hpz_partition_size = zpg, 
+        zero_quantized_weights = False, 
+        zero_quantized_gradients = False, 
     )
 
     if overlap_comm:
