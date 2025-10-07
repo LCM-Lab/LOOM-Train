@@ -6,3 +6,8 @@ from loomtrain.trainer.simpo import (
     SimPOTrainer, 
     SimPOBradleyTerryRMTrainer
 )
+
+from loomtrain.trainer.general import (
+    LoomTrainerConfig,
+    LoomTrainer
+)
