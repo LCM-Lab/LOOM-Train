@@ -28,13 +28,19 @@
 To install the`loomtrain` package from the gitee repository, run:
 
 ```bash
-git clone https://github.com/iiGray/loomtrain.git
-cd loomtrain
-conda create -n lcf python=3.10 -y
-conda activate lcf
+git clone https://github.com/LCM-Lab/LOOM-Train.git
+conda create -n loom_train python=3.10 -y
+conda activate loom_train
+cd LOOM-Train/loomtrain
 pip install -e .
-# install flash attention
+```
+To install flash attention, run the command below to obtain the required `flah-attn` version:
+```bash
+loomtrain-required-flash-attn
+```
+
 Download the suitable version of flash_attn from https://github.com/Dao-AILab/flash-attention/releases
+```bash
 pip install <path_to_flash_attn_whl_file>
 pip install ring_flash_attn
 ```
@@ -42,15 +48,10 @@ pip install ring_flash_attn
 ---
 
 ## 🛠️ Getting Started
-
-```bash
-pip install loom-train
-```
-
 Then just swap your `Trainer` with `LoomTrainer`:
 
 ```python
-from loom_train import LoomTrainer
+from loomtrain import LoomTrainer
 
 trainer = LoomTrainer(
     model=model,
