@@ -67,10 +67,7 @@ class DeepspeedStrategy(TrainStrategy):
             full_determinism = full_determinism,
             seed = seed
         )
-        
-        self.batch_size = parallel_config.train_batch_size
-        self.micro_batch_size = parallel_config.micro_batch_size
-        self.grad_accum = parallel_config.grad_accum
+        self.config = deepspeed_config
 
     def init_distributed(self):
         deepspeed.init_distributed(timeout = self.init_timeout)
