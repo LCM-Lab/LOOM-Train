@@ -19,11 +19,11 @@ class LoomSFT(LoomModule):
         super().__init__(opt_dicts)
     
     def setup_self_module(self):
-        self.actor = self.opt_dicts['group0'].actor
-        self.toknizer = self.opt_dicts['group0'].tokenizer
-        self.optimizer = self.opt_dicts['group0'].optimizer
-        self.scheduler = self.opt_dicts['group0'].scheduler, 
-        self.loss_fn = self.opt_dicts['group0'].loss_fn
+        self.actor = self.opt_groups['group0'].actor
+        self.toknizer = self.opt_groups['group0'].tokenizer
+        self.optimizer = self.opt_groups['group0'].optimizer
+        self.scheduler = self.opt_groups['group0'].scheduler, 
+        self.loss_fn = self.opt_groups['group0'].loss_fn
 
     def micro_batch_forward_backward(self, batch) -> "dict[str, obj]":
         inputs, attention_masks, loss_masks, seq_lens = batch
