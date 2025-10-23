@@ -3,7 +3,6 @@ from loomtrain.core.actor import LoomOptDict
 from loomtrain.core.module import LoomModule
 from loomtrain.core.datamodule import LoomDataModule
 from loomtrain.core.parallel import parallel_state as parallel
-from loomtrain.utils.distributed.torch import all_reduce
 
 
 class LoomSFT(LoomModule):
@@ -36,8 +35,8 @@ class LoomSFT(LoomModule):
 
         return dict(
             loss = gpt_loss.item(),
-            total_tokens = all_reduce(sum(seq_lens)) * parallel.get_dp_count() / 10 ** 9,
-            loss_tokens = all_reduce(loss_masks.int().sum().item()) * parallel.get_dp_count() / 10 ** 9
+            total_tokens = parallel.all_reduce(sum(seq_lens)) * parallel.get_dp_count() / 10 ** 9,
+            loss_tokens = parallel.all_reduce(loss_masks.int().sum().item()) * parallel.get_dp_count() / 10 ** 9
         )
 
     def micro_batch_validate_forward(self, batch):
@@ -49,8 +48,8 @@ class LoomSFT(LoomModule):
 
         return dict(
             loss = gpt_loss.item(),
-            total_tokens = all_reduce(sum(seq_lens)) * parallel.get_dp_count() / 10 ** 9,
-            loss_tokens = all_reduce(loss_masks.int().sum().item()) * parallel.get_dp_count() / 10 ** 9
+            total_tokens = parallel.all_reduce(sum(seq_lens)) * parallel.get_dp_count() / 10 ** 9,
+            loss_tokens = parallel.all_reduce(loss_masks.int().sum().item()) * parallel.get_dp_count() / 10 ** 9
         )
     
     def non_accum_logs_after_one_step(self):

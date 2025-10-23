@@ -373,3 +373,36 @@ def prepare_cp_input(*args, **kwargs):
 
 
 
+
+
+
+
+REDUCE_OP = dict(
+    mean = dist.ReduceOp.AVG,
+    max = dist.ReduceOp.MAX,
+    sum = dist.ReduceOp.SUM
+)
+
+def all_reduce(data, op: Literal["mean", "max", "sum"] = "mean", group: dist.ProcessGroup = None):
+    if isinstance(data, dict):
+        ret = {}
+        for k,v in data.items():
+            ret[k] = all_reduce(v, op)
+
+        return ret
+
+    is_tensor = isinstance(data, torch.Tensor)
+    if not is_tensor:
+        data = torch.Tensor([data])
+    is_cpu_tensor = data.device.type == "cpu"
+
+    if is_cpu_tensor:
+        data = data.to(torch.cuda.current_device())
+    
+    dist.all_reduce(data, op = REDUCE_OP[op], group = group)
+
+    if is_cpu_tensor:
+        data = data.cpu()
+    
+    return data if is_tensor else data.item()
+
