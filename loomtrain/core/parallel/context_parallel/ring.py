@@ -64,22 +64,11 @@ def set_cu_seqlens_for_ring_attn(
 
 
 
-
-@dataclass
-class RingAttnConfig:
-    ring_type: str = "llama"
-    ring_head_stride: int = 1
-
-
 class RingFlashAttnPlugin(parallel.ParallelPlugin, ContextParallel):
-    def __init__(self, config: "RingAttnConfig"):
-        self.config = config
-    
-    def initialize(self):
+    def initialize(self, head_stride:int = 1, **kwargs):
         from ring_flash_attn import substitute_hf_flash_attn
         ring_attn_group = parallel.get_cp_group()
-        substitute_hf_flash_attn(ring_attn_group, 
-                                 self.config.ring_head_stride)
+        substitute_hf_flash_attn(ring_attn_group, head_stride)
         
         parallel.prepare_cp_input = partial(
             substitute_hf_flash_attn, ring_attn_group = ring_attn_group
