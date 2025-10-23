@@ -68,7 +68,10 @@ class TrainStrategy:
         self.init_timeout = init_timeout
         self.full_determinism = full_determinism
         self.seed = seed
-    
+            
+        self.batch_size = parallel_config.train_batch_size
+        self.micro_batch_size = parallel_config.micro_batch_size
+        self.grad_accum = parallel_config.grad_accum
 
     def connect_opt_groups(self, opt_groups: "dict[str, LoomActorGroup]"):
         self.opt_groups = opt_groups
@@ -78,7 +81,7 @@ class TrainStrategy:
         self.set_seed()
         self.set_device()
         self.init_distributed()
-        self.init_parallel_groups()
+        self.init_parallel()
     
 
     def init_distributed(self):
@@ -141,10 +144,9 @@ class TrainStrategy:
             module.zero_grad = self.loomModule_zero_grad
         except Exception as e: ...
 
-        
 
-    def init_parallel_groups(self):
-        parallel.init_parallel_groups(self.parallel_config)
+    def init_parallel(self):
+        parallel.initialize(self.parallel_config)
 
     @property
     def world_size(self):

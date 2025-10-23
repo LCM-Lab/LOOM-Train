@@ -14,6 +14,7 @@ class ParallelConfig:
     pp:int = 1
     sp:int = 1
     tp:int = 1
+    cp_args: dict = dict( type = "ring", head_stride = 1)
     order = ("tp", "sp", "cp", "pp", "dp")
 
     @property
@@ -318,7 +319,11 @@ def set_initialized():
     global _IS_INITIALIZED_
     _IS_INITIALIZED_ = True
 
-def init_parallel_groups(parallel_config: "ParallelConfig"):
+def init_distributed(backend: str = "nccl"):
+    dist.init_process_group(backend = backend)
+
+
+def initialize(parallel_config: "ParallelConfig"):
     device_mesh = DeviceMesh(parallel_config)
 
     rank = dist.get_rank()
@@ -338,7 +343,15 @@ def init_parallel_groups(parallel_config: "ParallelConfig"):
         set_rank(rank)
         set_world_size(world_size)
     
+    _init_parallel_plugins(parallel_config)
+    
     set_initialized()
+
+def _init_parallel_plugins(parallel_config: "ParallelConfig"):
+    if parallel_config.cp_args['type'] == "ring":
+        from loomtrain.parallel.context_parallel.ring import RingFlashAttnPlugin
+        RingFlashAttnPlugin().initialize(** parallel_config.cp_args)
+    ... #TODO other parallel type
 
 def is_initialized() -> bool:
     return _IS_INITIALIZED_
