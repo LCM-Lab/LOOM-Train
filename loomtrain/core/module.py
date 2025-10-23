@@ -13,13 +13,18 @@ from dataclasses import dataclass
 
 
 class LoomModule(CheckpointMixin):
-    def __init__(self, opt_dicts: "list[LoomOptDict]" | "dict[str, LoomOptDict]"):        
-        assert parallel.is_initialized()
+    def __init__(self, opt_dicts: "list[LoomOptDict]" | "dict[str, LoomOptDict]" = None, actor_groups: "list[LoomActorGroup]" | "dict[str, LoomActorGroup]" = None):        
+        assert parallel.is_initialized(), "One must init `LoomTrainer` before init `LoomModule`"
 
         if isinstance(opt_dicts, list):
             opt_dicts = {f"model_{str(i)}": dic for i, dic in enumerate(opt_dicts)}
 
         self.opt_dicts = opt_dicts
+
+        if isinstance(actor_groups, list):
+            actor_groups = {f"model_{str(i)}": dic for i, dic in enumerate(actor_groups)}
+
+        self._actor_groups = actor_groups
 
     def _validate(self, datadmoule: "LoomDataModule"):
         logs_dict = dict()
@@ -45,7 +50,6 @@ class LoomModule(CheckpointMixin):
 
     def connect_datamodule(self, datamodule: "LoomDataModule"):
         '''must be called before connect_strategy, because total_steps unset'''
-        assert parallel.is_initialized()
         self.datamodule = datamodule
         for group in self.opt_dicts:
             group.total_steps = datamodule.total_train_steps
@@ -54,9 +58,12 @@ class LoomModule(CheckpointMixin):
         assert parallel.is_initialized()
         assert isinstance(strategy, TrainStrategy)
         self.strategy = strategy
-        self.strategy.config_loomModule_method(self)        
-        opt_groups = self.setup_module(self.opt_dicts)
-        self.opt_groups = self._setup_actors(opt_groups)
+        self.strategy.config_loomModule_method(self)
+        if self._actor_groups is None:        
+            opt_groups = self.setup_module(self.opt_dicts)
+            self.opt_groups = self._setup_actors(opt_groups)
+        else: 
+            self.opt_groups = self._actor_groups
 
         self.strategy.connect_opt_groups(self.opt_groups)
         self.setup_self_module()
