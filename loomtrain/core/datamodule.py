@@ -11,7 +11,8 @@ class LoomDataModule(CheckpointMixin):
                  train_dataset: "CollateDataset",
                  val_dataset: "CollateDataset",
                  ):
-        assert parallel.is_initialized()
+        assert parallel.is_initialized(), "One must init `LoomTrainer` before init `LoomDataModule`"
+
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
 
