@@ -11,7 +11,8 @@ class LoomSFT(LoomModule):
             group0 = LoomOptDict(
                 model_name = model_name,
                 model_type = 'causal',
-                loss_type = "sft"
+                loss_type = "sft",
+                collate_type = "packing"
             )
         )
 
@@ -24,10 +25,10 @@ class LoomSFT(LoomModule):
         self.scheduler = self.opt_groups['group0'].scheduler, 
         self.loss_fn = self.opt_groups['group0'].loss_fn
 
-    def micro_batch_forward_backward(self, batch) -> "dict[str, obj]":
+    def micro_batch_forward_backward(self, batch) -> "dict[str, object]":
         inputs, attention_masks, loss_masks, seq_lens = batch
-        outupt = self.actor(sequences = inputs, attention_masks = attention_masks,seq_lens = seq_lens)
-        labels = torch.where(attention_mask.bool() & loss_masks.bool(), inputs, self.loss_fn.ignore_index)
+        output = self.actor(sequences = inputs, attention_masks = attention_masks,seq_lens = seq_lens)
+        labels = torch.where(attention_masks.bool() & loss_masks.bool(), inputs, self.loss_fn.ignore_index)
 
         gpt_loss = self.loss_fn(output.logits, labels)
 
@@ -41,8 +42,8 @@ class LoomSFT(LoomModule):
 
     def micro_batch_validate_forward(self, batch):
         inputs, attention_masks, loss_masks, seq_lens = batch
-        outupt = self.actor(sequences = inputs, attention_masks = attention_masks,seq_lens = seq_lens)
-        labels = torch.where(attention_mask.bool() & loss_masks.bool(), inputs, self.loss_fn.ignore_index)
+        output = self.actor(sequences = inputs, attention_masks = attention_masks,seq_lens = seq_lens)
+        labels = torch.where(attention_masks.bool() & loss_masks.bool(), inputs, self.loss_fn.ignore_index)
 
         gpt_loss = self.loss_fn(output.logits, labels)
 
@@ -52,5 +53,5 @@ class LoomSFT(LoomModule):
             loss_tokens = parallel.all_reduce(loss_masks.int().sum().item()) * parallel.get_dp_count() / 10 ** 9
         )
     
-    def non_accum_logs_after_one_step(self):
+    def non_accum_logs_per_step(self):
         return dict(lr = self.scheduler.get_last_lr()[0])
