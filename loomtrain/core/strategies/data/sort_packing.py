@@ -1,59 +1,49 @@
 from typing import List
 import torch.utils.data as tud
-from loomtrain.utils.distributed_sampler import (
+
+from loomtrain.core.distributed_sampler import (
     DistributedSampler, DistributedBucketSampler
 )
-
-
-
 
 from loomtrain.core.data.dataset.base import CollateDataset
 
 from loomtrain.core.parallel import parallel_state as parallel
-from loomtrain.core.strategy import DataStrategy
+from loomtrain.core.strategy import DataConfig, DataStrategy
+from loomtrain.core.data.dataloader.iter import LoomDataIter
 
-class DataIterator: ...
 
 class SortPackingStrategy(DataStrategy):
     def __init__(self,
                  parallel_config: "parallel.ParallelConfig",
-                 bucket_size: int,
-                 batch_size: int = 1,
-                 pin_memory: bool = False,
-                 shuffle: bool = True,
-                 drop_last: bool = True,
-                 drop_exceed: bool = False,
-                 full_determinism: bool= False,
-                 seed:int = 42):
+                 data_config: "DataConfig",
+                 full_determinism: "bool" = False,
+                 seed:int = 42
+                 ):
         super().__init__(parallel_config = parallel_config, 
+                         data_config = data_config,
                          full_determinism = full_determinism, 
                          seed = seed)
-        self.bucket_size = bucket_size
-        self.batch_size = batch_size
-        self.pin_memory = pin_memory
-        self.shuffle = shuffle
-        self.drop_last = drop_last
-        self.drop_exceed = drop_exceed
 
-    def setup_data_iter(self, dataset: "CollateDataset") -> "DataIterator":
-        from loomtrain.core.data.distributed_sampler import DistributedBucketSampler
+    def setup_data_iter(self, dataset: "CollateDataset") -> "LoomDataIter":
+
+        dataset.initialize() # initilize here rather than when datamodule connect strategy, allowing distributed initializing.
 
         sampler = DistributedSampler(
             dataset,
-            bucket_size = self.bucket_size,
+            bucket_size = self.data_config.packing_length,
             num_replicas = self.num_replicas,
             rank = self.rank,
-            shuffle = self.shuffle,
+            shuffle = self.data_config.shuffle,
             seed = self.seed,
-            drop_last = self.drop_last,
-            drop_exceed = self.drop_exceed
+            drop_last = self.data_config.drop_last,
+            drop_exceed = self.data_config.drop_exceed
         )
 
-        return tud.DataLoader(
+        return LoomDataIter(
             dataset, 
+            batch_size = self.data_config.batch_size,
+            num_epochs = self.data_config.num_epochs,
             collate_fn = dataset.collate_fn,
-            pin_memory = self.pin_memory,
+            pin_memory = self.data_config.pin_memory,
             batch_sampler = sampler
         )
-
-    

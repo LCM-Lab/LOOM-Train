@@ -11,5 +11,9 @@ class CollateDataset(tud.Dataset): # TODO: add tokenizer
     def collate_fn(self,item_list):
         return torch.stack(item_list)
     def initialize(self, * args, **kwargs):
-        '''This DataSet only init when using post'''
+        '''
+        The initialization of this kind of dataset is not occurred when be instantiated, 
+        but when dataloader is created. So that different rank can initialize different part
+        of the dataset, which is more efficient.
+        '''
         raise NotImplementedError

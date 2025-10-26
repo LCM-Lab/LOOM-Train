@@ -1,5 +1,6 @@
 import os, torch, transformers
-from typing import Callable
+from typing import Callable, Literal
+from torch import nn
 import torch.utils.data as tud
 import torch.distributed as dist
 from datetime import timedelta
@@ -17,8 +18,15 @@ from functools import partial
 @dataclass
 class DataConfig:
     collate_type: Literal["packing", "padding"]
-    packing_length: int = None # work while collate_type is packing
-    val_interval: int 
+    packing_length: "int" = None # work while collate_type is packing
+    val_interval: "int" = None
+    batch_size: "int" = 1
+    num_epochs: "int" = 1
+    pin_memory: "bool" = False
+    shuffle: "bool" = True
+    drop_last: "bool" = True
+    drop_exceed: "bool" = False
+
 
 class DataStrategy: 
     '''
@@ -43,15 +51,8 @@ class DataStrategy:
 
     def setup_data_iter(self, 
                         dataset: "tud.Dataset") -> "LoomDataIter":
-        
-        '''
-        batch_size is actually micro_batch_size
-        '''
         raise NotImplementedError
 
-    @property
-    def total_train_steps(self):
-        raise NotImplementedError
 
 # TBD
 class TrainStrategy:
