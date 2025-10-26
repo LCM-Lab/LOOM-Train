@@ -350,7 +350,7 @@ def initialize(parallel_config: "ParallelConfig"):
 
 def _init_parallel_plugins(parallel_config: "ParallelConfig"):
     if parallel_config.cp_args['type'] == "ring":
-        from loomtrain.parallel.context_parallel.ring import RingFlashAttnPlugin
+        from loomtrain.core.parallel.context_parallel.ring import RingFlashAttnPlugin
         RingFlashAttnPlugin().initialize(** parallel_config.cp_args)
     ... #TODO other parallel type
 
@@ -368,6 +368,10 @@ class ParallelPlugin:
 
 
 def prepare_cp_input(*args, **kwargs):
+    '''
+    Will soon be replaced by specific context parallel plugin after training process starts. 
+    It can be sure that the replacing process is executed before it's being called.
+    '''
     raise NotImplementedError
     
 
