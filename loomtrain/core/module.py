@@ -132,7 +132,11 @@ class LoomModule(CheckpointMixin):
         '''You May implement this function, or implement `forward_backward` directly.'''
         raise NotImplementedError
 
-    def non_accum_logs_after_one_step(self) -> "dict[str, Accumulator]":
+    def non_accum_logs_per_step(self) -> "dict[str, Accumulator]":
+        '''
+        This function returns a dict of variables for being visualized,
+          (Only for those remain the same among different micro batches of a same global batch, and different among different global batches, such as the value of learning rate)
+        '''
         return dict()
 
     def forward_backward(self, batches) -> "dict[str, Accumulator]":
@@ -181,7 +185,7 @@ class LoomModule(CheckpointMixin):
         train_logs_dict = self.forward_backward(batches)
         self.step(self.opt_groups)
         self.zero_grad(self.opt_groups)
-        train_logs_dict.update(self.non_accum_logs_after_one_step())
+        train_logs_dict.update(self.non_accum_logs_per_step())
         
         return train_logs_dict
         

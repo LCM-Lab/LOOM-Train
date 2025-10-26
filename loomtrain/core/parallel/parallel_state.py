@@ -1,5 +1,6 @@
 from typing import Literal, List
 from dataclasses import dataclass
+import torch
 import torch.distributed as dist
 from loomtrain.core.device.mesh import DeviceMesh
 
