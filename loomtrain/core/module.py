@@ -1,12 +1,15 @@
 import os
+import torch
 from torch import nn
 import torch.distributed as dist
 from transformers import PreTrainedTokenizer
 from collections import defaultdict
+from tqdm import tqdm
 from loomtrain.core.parallel import parallel_state as parallel
 from loomtrain.core.strategy import TrainStrategy
-from loomtrain.core.state import CheckpointMixin
+from loomtrain.core.state import CheckpointConfig, CheckpointMixin
 from loomtrain.core.actor import LoomOptDict, LoomActorGroup
+from loomtrain.core.datamodule import LoomDataModule
 from loomtrain.core.visualization import Accumulator
 from loomtrain.utils.lora import LoRAConfig, get_peft_model
 from dataclasses import dataclass
@@ -26,16 +29,16 @@ class LoomModule(CheckpointMixin):
 
         self._actor_groups = actor_groups
 
-    def _validate(self, datadmoule: "LoomDataModule"):
+    def _validate(self, datamodule: "LoomDataModule"):
         logs_dict = dict()
-        if datadmoule.is_validating_step():
+        if datamodule.is_validating_step():
             self.eval()
             datamodule.eval()
-            datadmoule._setup_val_data_iter()
+            datamodule._setup_val_data_iter()
             with torch.no_grad():
-                logs_dict = self.validate(datadmoule.val_data_iter)
+                logs_dict = self.validate(datamodule.val_data_iter)
             self.train()
-            datamoduel.train()
+            datamodule.train()
         return logs_dict
 
     @property
@@ -159,7 +162,7 @@ class LoomModule(CheckpointMixin):
         
         step_bar = tqdm(
                 range(len(self.eval_dataloader)),
-                desc = f"Eval stage of steps {global_step}",
+                desc = f"Eval stage of steps {self.global_step}",
                 disable = parallel.get_rank() != 0
             )
         for batches in val_data_iter:
