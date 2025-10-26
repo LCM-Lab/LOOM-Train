@@ -15,6 +15,7 @@ class LoomOptDict(AttrDict):
         self,
         model_name: str = None,
         model_type :Literal["causal", "classifier"] = "causal",
+        collate_type: Literal["packing", "padding"] = "packing", #TODO: padding
         loss_type: Literal["sft", "simpo"] = "sft",
         tokenizer_name = None,
         lr   : "float" = None,
@@ -35,19 +36,19 @@ class LoomOptDict(AttrDict):
         num_warmup_steps: "int" = None,
     ):
 
-        if warmup_ratios is not None:
-            num_warmup_steps = round(total_steps * warmup_ratios)
 
         super().__init__(
             model_name = model_name,
             model_type = model_type,
+            collate_type = collate_type,
             tokenizer_name = tokenizer_name,
             lr = lr,
             min_lr = min_lr,
             lr_type = lr_type,
+            warmup_ratios = warmup_ratios,
             num_warmup_steps = num_warmup_steps,
             loss_type = loss_type,
-            total_steps = None,
+            total_steps = None, # This proprety will be set after module.connect_datamodule(datamodule)
         )
 
         self.model_name = model_name
@@ -57,10 +58,20 @@ class LoomOptDict(AttrDict):
         self.lr = lr
         self.min_lr = min_lr
         self.lr_type = lr_type
-        self.num_warmup_steps = num_warmup_steps
+        self.betas = betas
+        self.L2_weight_decay = L2_weight_decay
+        self.warmup_ratios = warmup_ratios
+        self._num_warmup_steps = num_warmup_steps
         self.loss_type = loss_type
         self.total_steps = None
 
+    @property
+    def num_warmup_steps(self):
+        if not self._num_warmup_steps:
+            assert self.total_steps, "LoomModule should connect LoomDataModule first."
+            self._num_warmup_steps = round(self.total_steps * self.warmup_ratios)
+
+        return self._num_warmup_steps
 
 
 class LoomActorGroup(AttrDict):
@@ -71,6 +82,7 @@ class LoomActorGroup(AttrDict):
         optimizer,
         scheduler,
         actor_type: Literal["causal", "classifier"] = "causal",
+        collate_type: Literal["packing", "padding"] = "packing", #TODO: padding
         loss_type: Literal["sft", "simpo"] = "sft",
         actor: "Actor" = None,
         loss_fn = None):
@@ -91,8 +103,9 @@ class LoomActorGroup(AttrDict):
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.actor_type = actor_type
+        self.collate_type = collate_type
         self.loss_type = loss_type
     
     def build_actor(self):
-        self.actor = get_actor_cls(self.actor_type)(self.model)
+        self.actor = get_actor_cls(self.actor_type, self.collate_type)(self.model)
         self.loss_fn = get_loss_cls(self.loss_type)()
