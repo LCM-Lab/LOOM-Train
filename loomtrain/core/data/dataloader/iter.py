@@ -29,18 +29,21 @@ class LoomDataIter(tud.DataLoader):
 
         self.num_epochs = num_epochs
         self._exhausted = False
-    
+
+        self.data_iter = iter(self)
+        self.next_batch = next(self.data_iter)
+
     @property
     def exhausted(self):
         return self._exhausted
 
+    def __next__(self):
+        current_batch = self.next_batch
+        try: self.next_batch = next(self.data_iter)
+        except StopIteration: self._exhausted = True
+        return current_batch
+
+
     def __iter__(self):
         for _ in range(self.num_epochs):
             yield from iter(super().__iter__())
-        
-        self._exhausted = True
-        yield None
-    
-    
-    def __len__(self):
-        ...

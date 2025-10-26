@@ -34,8 +34,6 @@ class LoomDataModule(CheckpointMixin):
     def connect_strategy(self, strategy: "DataStrategy"):
         assert isinstance(strategy, DataStrategy)
         self.strategy = strategy
-        self.train_dataset.initialize()
-        self.val_dataset.initialize()
 
     @property
     def total_train_steps(self):
