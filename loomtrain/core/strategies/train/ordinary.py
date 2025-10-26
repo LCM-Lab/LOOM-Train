@@ -1,33 +1,15 @@
 from __future__ import annotations
 import os
-from copy import deepcopy
-from typing import Union, Literal, Callable, TYPE_CHECKING
-from datetime import timedelta
-from dataclasses import dataclass
-import torch, transformers, deepspeed
+import torch
 import torch.distributed as dist
-from torch import nn
-import torch.utils.data as tud
-from ring_flash_attn import substitute_hf_flash_attn
-from transformers import PreTrainedTokenizer
-# from deepspeed import PipelineEngine
-from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
-from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-from loomtrain.utils.distributed_sampler import (
-    DistributedSampler, DistributedBucketSampler
-)
-if TYPE_CHECKING:
-    from loomtrain.trainer.base import TrainerConfig
-    from loomtrain.utils.lora import LoRAConfig
+from copy import deepcopy
 from peft import get_peft_model_state_dict, get_peft_model, PeftModel
 # from loomtrain.strategy.base import Strategy
 
 from loomtrain.core.strategy import TrainStrategy
 from loomtrain.core.parallel import parallel_state as parallel
 
-from loomtrain.strategy.deepspeed.utils import *
-from loomtrain.modeling.gpt import GPT
-from loomtrain.modeling.rm import RM
+from loomtrain.core.modeling.actors import PackingGPT, PackingRM
 from loomtrain.utils.init_hf import init_model
 from loomtrain.utils.common import IO
 
@@ -93,7 +75,8 @@ class OrdinaryStrategy(TrainStrategy):
     def loomModule_save_module(self, save_dir: str):        
         for name, group in self.opt_groups.items():
             gathered_state_dict = dict()
-            model_to_save = group.model
+            actor = group.actor
+            model_to_save = actor.model
 
             csave_dir = os.path.join(save_dir, name)
 
@@ -110,9 +93,9 @@ class OrdinaryStrategy(TrainStrategy):
                 f"Mismatch keys: {gathered_state_dict_keys.symmetric_difference(state_dict_keys)}"
 
                 if isinstance(model_to_save, PeftModel):
-                    if isinstance(model, GPT):
+                    if isinstance(actor, PackingGPT):
                         model_to_save = deepcopy(model_to_save)
-                    elif isinstance(model, RM):
+                    elif isinstance(actor, PackingRM):
                         base_model = init_model(model_to_save.base_model.model._load_path,
                                                 model_type = "classifier")
                         cloned = get_peft_model(base_model, self.lora_config)
@@ -122,10 +105,10 @@ class OrdinaryStrategy(TrainStrategy):
 
                     if self.lora_config.save_merged:
                         model_to_save = model_to_save.merge_and_unload()
-                        model_to_save.save_pretrained(csave_dir, ** kwargs)
+                        model_to_save.save_pretrained(csave_dir, )
                     else:
                         adapter_csave_dir = csave_dir
-                        model_to_save.save_pretrained(adapter_csave_dir, ** kwargs)
+                        model_to_save.save_pretrained(adapter_csave_dir, )
                         if self.config.zero_stage == 3:
                             torch.save(
                                 get_peft_model_state_dict(model_to_save, gathered_state_dict),
@@ -134,11 +117,11 @@ class OrdinaryStrategy(TrainStrategy):
                         
                 else:
                     model_to_save.save_pretrained(
-                        save_directory = csave_dir, state_dict = gathered_state_dict, **kwargs)
+                        save_directory = csave_dir, state_dict = gathered_state_dict, )
 
                 model_to_save.config.to_json_file(os.path.join(csave_dir, "config.json"))
 
-                tokenizer.save_pretrained(csave_dir)
+                group.tokenizer.save_pretrained(csave_dir)
 
 
                 train_from_model_path = model_to_save.config._name_or_path
