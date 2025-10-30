@@ -54,15 +54,25 @@ class LoomModule(CheckpointMixin):
     def connect_datamodule(self, datamodule: "LoomDataModule"):
         '''must be called before connect_strategy, because total_steps unset'''
         self.datamodule = datamodule
-        for group in self.opt_dicts:
+        is_first_group = True
+        for group in self.opt_dicts.values():
             group.total_steps = datamodule.total_train_steps
+            if is_first_group:
+                if not datamodule.train_dataset.tokenizer_name:
+                    datamodule.train_dataset.tokenizer_name = group.tokenizer_name
+                    datamodule.val_dataset.tokenizer_name = group.tokenizer_name
+                is_first_group = False
 
     def connect_strategy(self, strategy: "TrainStrategy"):
         assert parallel.is_initialized()
         assert isinstance(strategy, TrainStrategy)
         self.strategy = strategy
         self.strategy.config_loomModule_method(self)
-        if self._actor_groups is None:        
+
+        if self._actor_groups is None:
+            for opt_dict in self.opt_dicts.values():
+                opt_dict.collate_type = strategy.data_config.collate_type
+
             opt_groups = self.setup_module(self.opt_dicts)
             self.opt_groups = self._setup_actors(opt_groups)
         else: 
