@@ -2,17 +2,9 @@ import bisect, random
 from typing import List
 from loomtrain.core.data.dataset.base import CollateDataset
 
-
-
-class BucketMixin: # For inheriting. Currently useless.
-    @property
-    def input_ids_lens(self):
-        assert hasattr(self, "_input_ids_lens"), \
-            "To use DistributedBucketSampler, please set `input_ids_lens` in your dataset when initializing."
-        return self.input_ids_lens
     
 
-class BlendedDataset:
+class BlendedDataset(CollateDataset):
     def __init__(self, 
                  datasets: List[CollateDataset],
                  sample_ratios: List[float] = None,
