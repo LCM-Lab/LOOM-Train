@@ -31,6 +31,7 @@ class LoomTrainer:
             checkpoint_config: "CheckpointConfig"):
         
         module.connect_datamodule(datamodule)
+        datamodule.connect_module(module)
         module.connect_strategy(self.train_strategy)
         datamodule.connect_strategy(self.data_stretegy)
 

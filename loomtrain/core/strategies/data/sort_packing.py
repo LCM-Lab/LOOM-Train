@@ -47,3 +47,9 @@ class SortPackingStrategy(DataStrategy):
             pin_memory = self.data_config.pin_memory,
             batch_sampler = sampler
         )
+
+    def loomDataModule_save_ckpt(self, save_dir, tag):
+        ...
+
+    def loomDataModule_load_ckpt(self, saved_dir, tag):
+        ...
