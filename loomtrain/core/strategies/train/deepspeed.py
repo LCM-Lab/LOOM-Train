@@ -21,7 +21,7 @@ from loomtrain.core.modeling.actors import PackingGPT, PackingRM
 
 from loomtrain.utils.common import IO
 
-
+from loomtrain.core.strategy import DataConfig
 from loomtrain.core.actor import LoomOptDict, LoomActorGroup
 
 @dataclass
@@ -39,24 +39,22 @@ class DeepspeedConfig:
     torch_compile   : bool = False #useless ?
 
 
-@dataclass
-class RingAttnConfig:
-    ring_attn_size  : int = 1
-    ring_head_stride: int = 1
-
 class DeepspeedStrategy(TrainStrategy):
     def __init__(
             self,
             parallel_config: "parallel.ParallelConfig",
+            data_config: "DataConfig",
             deepspeed_config: "DeepspeedConfig" = None,
             full_determinism: bool = False,
             seed: int = 42,
     ):
         super().__init__(
             parallel_config = parallel_config,
+            data_config = data_config,
             full_determinism = full_determinism,
             seed = seed
         )
+        if deepspeed_config is None: deepspeed_config = DeepspeedConfig()
         self.config = deepspeed_config
 
     def init_distributed(self):

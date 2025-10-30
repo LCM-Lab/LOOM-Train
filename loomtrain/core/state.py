@@ -6,15 +6,15 @@ from loomtrain.core.strategy import *
 
 @dataclass
 class CheckpointConfig:
-    load_dir = str
-    save_dir = str
+    load_dir: str
+    save_dir: str
     
-    do_resume = True
-    ckpt_interval = 10
-    weight_interval = 10
-    visulization_interval = 10
-    max_ckpts = 2
-    max_ckpts_GB = 1024
+    do_resume: bool = True
+    ckpt_interval: int = 10
+    weight_interval: int = 10
+    visulization_interval: int = 10
+    max_ckpts: int = 2
+    max_ckpts_GB: int = 1024
 
 
 class CheckpointMixin:

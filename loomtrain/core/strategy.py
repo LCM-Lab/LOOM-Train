@@ -10,6 +10,7 @@ from loomtrain.core.data.dataloader.iter import LoomDataIter
 # from loomtrain.core.device.mesh import DeviceMes
 from loomtrain.core.parallel import parallel_state as parallel
 from loomtrain.core.module import LoomModule
+from loomtrain.core.datamodule import LoomDataModule
 from loomtrain.core.actor import LoomActorGroup
 from dataclasses import dataclass
 from functools import partial
@@ -52,7 +53,21 @@ class DataStrategy:
     def setup_data_iter(self, 
                         dataset: "tud.Dataset") -> "LoomDataIter":
         raise NotImplementedError
+    
 
+
+    def loomDataModule_save_ckpt(self, save_dir: str, tag: str):
+        raise NotImplementedError
+    
+    def loomDataModule_load_ckpt(self, saved_dir: str, tag: str):
+        raise NotImplementedError
+
+
+    def config_loomDataModule_method(self, datamodule: "LoomDataModule"):
+        datamodule.save_ckpt = self.loomDataModule_save_ckpt
+        datamodule.load_ckpt = self.loomDataModule_load_ckpt
+        
+        
 
 # TBD
 class TrainStrategy:
@@ -62,10 +77,12 @@ class TrainStrategy:
 
     def __init__(self,
                  parallel_config: "parallel.ParallelConfig",
+                 data_config: "DataConfig",
                  init_timeout = timedelta(minutes = 60),
                  full_determinism: bool = False,
                  seed: int = 42,):
         self.parallel_config = parallel_config
+        self.data_config = data_config 
         self.init_timeout = init_timeout
         self.full_determinism = full_determinism
         self.seed = seed

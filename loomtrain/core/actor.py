@@ -53,6 +53,7 @@ class LoomOptDict(AttrDict):
 
         self.model_name = model_name
         self.model_type = model_type
+        self.collate_type = collate_type
         if tokenizer_name is None:
             self.tokenizer_name = model_name
         self.lr = lr
