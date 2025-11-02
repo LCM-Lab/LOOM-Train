@@ -1,20 +1,29 @@
 from dataclasses import dataclass
 import torch.distributed as dist
-from loomtrain.utils.common.iotools import IO
+from loomtrain.core.utils.common.iotools import IO
+from loomtrain.core.utils import rank0print
 from loomtrain.core.strategy import *
 
 
 @dataclass
 class CheckpointConfig:
-    load_dir: str
     save_dir: str
+    load_dir: str = None
     
     do_resume: bool = True
     ckpt_interval: int = 10
     weight_interval: int = 10
-    visulization_interval: int = 10
+    visulization_interval: int = None
     max_ckpts: int = 2
     max_ckpts_GB: int = 1024
+
+    def __post_init__(self):
+        if self.load_dir is None:
+            self.load_dir = self.save_dir
+        
+        if self.visulization_interval is None:
+            self.visulization_interval = min(self.weight_interval, self.ckpt_interval)
+
 
 
 class CheckpointMixin:
@@ -27,11 +36,6 @@ class CheckpointMixin:
     @property
     def global_step(self): return self._global_step
 
-
-    @property
-    def state(self):
-        '''The state to save'''
-        raise NotImplementedError
 
     def get_saved_sub_dir(self) -> str:
         ''' sub_dir mainly for different types or checkpoint '''
@@ -103,15 +107,28 @@ class CheckpointMixin:
 
     
 
-    def _load_ckpt(self, checkpoint_config: "CheckpointConfig"):
+    def _load_ckpt(self, checkpoint_config: "CheckpointConfig", inplace: bool = False):
+        self.checkpoint_config = checkpoint_config
         saved_dir = checkpoint_config.save_dir
         saved_dir = os.path.join(saved_dir, self.get_saved_sub_dir())
         latest_path = os.path.join(saved_dir, "latest")
+        
+        if not inplace:
+            if not os.path.exists(saved_dir) or (not os.path.exists(latest_path)):
+                rank0print(f"Make sure that this is the first training process,"
+                            f" because ckpt path:`{saved_dir}` doesn't exist .")
+                return
+            
+        tag = None
         if os.path.exists(latest_path): # only for those ckpts having multiple files
             with open(latest_path, "r") as f:
                 tag = f.read().strip()
         try:
-            return self.load_ckpt(saved_dir, tag)    
-        finally:
+            load_result = self.load_ckpt(saved_dir, tag) 
             if dist.get_rank() == 0:
                 print(f"Successfully load {self.__class__.__name__} Checkpoint from: {saved_dir} !!!")
+            return load_result
+
+        except Exception as e:
+            if dist.get_rank() == 0:
+                print(f"Fail to load {self.__class__.__name__} Checkpoint from: {saved_dir}")
