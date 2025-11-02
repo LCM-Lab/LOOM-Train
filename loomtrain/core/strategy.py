@@ -63,10 +63,26 @@ class DataStrategy:
             self._rank = parallel.get_dp_rank()
         return self._rank
 
-    def setup_data_iter(self, 
-                        dataset: "tud.Dataset") -> "LoomDataIter":
-        raise NotImplementedError
-    
+    def _setup_train_data_iter(self, train_dataset: "tud.Dataset"):
+        self.train_data_iter = self.setup_data_iter(train_dataset)
+        return self.train_data_iter
+
+    def _setup_val_data_iter(self, val_dataset: "tud.Dataset"):
+        self.val_data_iter = self.setup_data_iter(val_dataset)
+        return self.val_data_iter
+
+
+    def config_loomDataModule_method(self, datamodule: "LoomDataModule"):
+        try:
+            self.loomDataModule_load_ckpt(None, None)
+        except NotImplementedError: ...
+        except Exception as e: 
+            datamodule.load_ckpt = self.loomDataModule_load_ckpt
+        try:
+            self.loomDataModule_save_ckpt(None, None)
+        except NotADirectoryError: ...
+        except Exception as e: 
+            datamodule.load_ckpt = self.loomDataModule_load_ckpt
 
 
     def loomDataModule_save_ckpt(self, save_dir: str, tag: str):
@@ -75,12 +91,11 @@ class DataStrategy:
     def loomDataModule_load_ckpt(self, saved_dir: str, tag: str):
         raise NotImplementedError
 
+    def setup_data_iter(self, 
+                        dataset: "tud.Dataset") -> "LoomDataIter":
+        raise NotImplementedError
 
-    def config_loomDataModule_method(self, datamodule: "LoomDataModule"):
-        datamodule.save_ckpt = self.loomDataModule_save_ckpt
-        datamodule.load_ckpt = self.loomDataModule_load_ckpt
-        
-        
+
 
 # TBD
 class TrainStrategy:

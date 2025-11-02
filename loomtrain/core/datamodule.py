@@ -210,10 +210,10 @@ class LoomDataModule(CheckpointMixin):
 
 
     def _setup_train_data_iter(self):
-        self.train_data_iter = self.strategy.setup_data_iter(self.train_dataset)
+        self.train_data_iter = self.strategy._setup_train_data_iter(self.train_dataset)
 
     def _setup_val_data_iter(self):
-        self.val_data_iter = self.strategy.setup_data_iter(self.val_dataset)
+        self.val_data_iter = self.strategy._setup_val_data_iter(self.val_dataset)
 
 
     def get_saved_sub_dir(self): return "data_iter"

@@ -54,15 +54,22 @@ class LoomDataIter(tud.DataLoader):
     def __iter__(self):
         for epoch in range(self.num_epochs):
             self._current_epoch = epoch
-            if epoch < self.start_epoch:continue
-            self.load_sampler_state(epoch, self.start_epoch)
+            if epoch < self.consumed_epoch:continue
+            self.set_sampler_state(epoch, self.consumed_epoch, self.consumed_samples)
             yield from iter(super().__iter__())
-    
 
-    def set_state(self, start_epoch: int, consumed_samples = 0):
-        self.start_epoch = start_epoch
+
+
+
+    def set_sampler_state(self, current_epoch: int, consumed_epoch:int, consumed_samples):
+        raise NotImplementedError
+
+
+    def set_state(self, consumed_epoch: int, consumed_samples = 0):
+        self.consumed_epoch = consumed_epoch
         self.consumed_samples = consumed_samples
     
 
     def get_state(self) -> dict:
-        ...
+        raise NotImplementedError
+
