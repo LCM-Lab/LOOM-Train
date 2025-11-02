@@ -1,5 +1,5 @@
 import os, torch, transformers
-from typing import Callable, Literal
+from typing import Callable, Literal, TYPE_CHECKING
 from torch import nn
 import torch.utils.data as tud
 import torch.distributed as dist
@@ -9,8 +9,9 @@ from loomtrain.core.data.dataloader.iter import LoomDataIter
 
 # from loomtrain.core.device.mesh import DeviceMes
 from loomtrain.core.parallel import parallel_state as parallel
-from loomtrain.core.module import LoomModule
-from loomtrain.core.datamodule import LoomDataModule
+if TYPE_CHECKING:
+    from loomtrain.core.module import LoomModule
+    from loomtrain.core.datamodule import LoomDataModule
 from loomtrain.core.actor import LoomActorGroup
 from dataclasses import dataclass
 from functools import partial
@@ -20,6 +21,10 @@ from functools import partial
 class DataConfig:
     collate_type: Literal["packing", "padding"]
     packing_length: "int" = None # work while collate_type is packing
+    
+    train_batch_size: int = 1
+    micro_batch_size: int = 1
+    val_batch_size: int = 1
     val_interval: "int" = None
     batch_size: "int" = 1
     num_epochs: "int" = 1
@@ -28,6 +33,9 @@ class DataConfig:
     drop_last: "bool" = True
     drop_exceed: "bool" = False
 
+    @property
+    def grad_accum(self):
+        return self.train_batch_size * parallel.get_cp_size() // self.micro_batch_size // parallel.get_world_size()
 
 class DataStrategy: 
     '''
@@ -38,17 +46,22 @@ class DataStrategy:
                  data_config: "DataConfig",
                  full_determinism: "bool" = False,
                  seed:int = 42):
-        assert parallel.is_initialized()
         self.parallel_config = parallel_config
         self.data_config = data_config
         self.full_determinism = full_determinism
         self.seed = seed
 
         self.dp_size = self.parallel_config.dp
-        self.num_replicas = self.parallel_config.size_expect_dp
+        self.num_replicas = self.parallel_config.dp
 
-        self.rank = parallel.get_dp_rank()
-
+        self._rank = None
+    
+    @property
+    def rank(self):
+        if self._rank is None:
+            assert parallel.is_initialized()
+            self._rank = parallel.get_dp_rank()
+        return self._rank
 
     def setup_data_iter(self, 
                         dataset: "tud.Dataset") -> "LoomDataIter":
@@ -87,9 +100,9 @@ class TrainStrategy:
         self.full_determinism = full_determinism
         self.seed = seed
             
-        self.batch_size = parallel_config.train_batch_size
-        self.micro_batch_size = parallel_config.micro_batch_size
-        self.grad_accum = parallel_config.grad_accum
+        self.batch_size = data_config.train_batch_size
+        self.micro_batch_size = data_config.micro_batch_size
+
 
     def connect_opt_groups(self, opt_groups: "dict[str, LoomActorGroup]"):
         self.opt_groups = opt_groups
@@ -114,7 +127,7 @@ class TrainStrategy:
     def loomModule_save_module(self, save_dir: str, tag: str):
         raise NotImplementedError
 
-    def loomModule_setup_module(self, modules: "list[nn.Module]" | "dict[str, nn.Module]") -> None:
+    def loomModule_setup_module(self, modules: "list[nn.Module] | dict[str, nn.Module]") -> None:
         raise NotImplementedError
 
     def loomModule_setup_optimizer(self):
@@ -165,6 +178,7 @@ class TrainStrategy:
 
     def init_parallel(self):
         parallel.initialize(self.parallel_config)
+        self.grad_accum = self.data_config.grad_accum
 
     @property
     def world_size(self):
