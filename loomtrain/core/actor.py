@@ -18,10 +18,10 @@ class LoomOptDict(AttrDict):
         collate_type: Literal["packing", "padding"] = "packing", #TODO: padding
         loss_type: Literal["sft", "simpo"] = "sft",
         tokenizer_name = None,
-        lr   : "float" = None,
+        lr   : "float" = 1e-5,
         min_lr: "float" = None,
-        betas: "tuple" = None,
-        L2_weight_decay: float = None,
+        betas: "tuple" = (0.9, 0.95),
+        L2_weight_decay: float = 0.0,
         lr_type: Literal["linear",
                        "cosine",
                        "cosine_with_restarts",
@@ -32,7 +32,7 @@ class LoomOptDict(AttrDict):
                        "reduce_lr_on_plateau",
                        "cosine_with_min_lr",
                        "warmup_stable_decay"] = "cosine_with_min_lr",
-        warmup_ratios: "int" = None,
+        warmup_ratios: "int" = 0.03,
         num_warmup_steps: "int" = None,
     ):
 
