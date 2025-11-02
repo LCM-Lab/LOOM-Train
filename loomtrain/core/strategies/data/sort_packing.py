@@ -26,9 +26,20 @@ class SortPackingStrategy(DataStrategy):
 
     def setup_data_iter(self, dataset: "CollateDataset") -> "LoomDataIter":
 
-        dataset.initialize() # initilize here rather than when datamodule connect strategy, allowing distributed initializing.
+        Sampler = DistributedSampler
+        sampler_type = 'sampler'
 
-        sampler = DistributedSampler(
+        dataloader_kwargs = dict(
+            batch_size = self.data_config.micro_batch_size,
+            num_epochs = self.data_config.num_epochs,
+            pin_memory = self.data_config.pin_memory
+        )
+        if self.data_config.packing_length:
+            Sampler = DistributedBucketSampler
+            sampler_type = 'batch_sampler'
+            dataloader_kwargs.pop('batch_size')
+        
+        dataloader_kwargs[sampler_type] = Sampler(
             dataset,
             bucket_size = self.data_config.packing_length,
             num_replicas = self.num_replicas,
@@ -41,15 +52,11 @@ class SortPackingStrategy(DataStrategy):
 
         return LoomDataIter(
             dataset, 
-            batch_size = self.data_config.batch_size,
-            num_epochs = self.data_config.num_epochs,
-            collate_fn = dataset.collate_fn,
-            pin_memory = self.data_config.pin_memory,
-            batch_sampler = sampler
+            ** dataloader_kwargs
         )
 
     def loomDataModule_save_ckpt(self, save_dir, tag):
-        ...
+        raise NotImplementedError
 
     def loomDataModule_load_ckpt(self, saved_dir, tag):
-        ...
+        raise NotImplementedError
