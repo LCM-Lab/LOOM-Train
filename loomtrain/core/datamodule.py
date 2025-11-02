@@ -1,13 +1,16 @@
 import types
-from typing import Literal, Callable
+from typing import Literal, Callable, TYPE_CHECKING
 from functools import partial, wraps
 from loomtrain.core.state import CheckpointMixin
-from loomtrain.core.module import LoomModule
+if TYPE_CHECKING:
+    from loomtrain.core.module import LoomModule
 from loomtrain.core.utils.init_hf import init_tokenizer
 from loomtrain.core.strategy import DataStrategy
 from loomtrain.core.data.dataset.base import CollateDataset
 from loomtrain.core.data.dataset.blended import BlendedDataset
+from loomtrain.core.data.dataloader.iter import LoomDataIter
 import torch, datasets
+from loomtrain.core.utils import *
 from loomtrain.core.parallel import parallel_state as parallel
 from loomtrain.core.actor import AttrDict
 
@@ -18,8 +21,10 @@ class LoomDataDict(AttrDict):
     def __init__(self, 
                  data_path: "str", 
                  tokenizer_path: "str",
-                 count: "int" = None, 
-                 ratio: "float" = 1., 
+                 train_count: "int" = None,
+                 train_ratio: "float" = 1., 
+                 val_count: "int" = None, 
+                 val_ratio: "float" = 1.,
                  **kwargs):
         '''
         path is the formatted(datasets.Dataset) dataset path, containing train/val
@@ -28,13 +33,18 @@ class LoomDataDict(AttrDict):
         super().__init__(
             data_path = data_path, 
             tokenizer_path = tokenizer_path, 
-            count = count, 
-            ratio = ratio, **kwargs
+            train_count = train_count, 
+            train_ratio = train_ratio, 
+            val_count = val_count, 
+            val_ratio = val_ratio, **kwargs
         )
         self.data_path = data_path
         self.tokenizer_path = tokenizer_path
-        self.count = count
-        self.ratio = ratio
+        self.train_count = train_count
+        self.train_ratio = train_ratio
+
+        self.val_count = val_count
+        self.val_ratio = val_ratio
 
 
         # self.train_dataset = None # dataset is intialized outside after distributed env starts
@@ -46,7 +56,12 @@ class LoomDataDict(AttrDict):
         self.tokenizer = init_tokenizer(self.tokenizer_path)
 
 class LoomDataModule(CheckpointMixin):
+    '''
+    LoomDataModule, CollateDataset, data_dicts are all not serielizable. 
+    Thus, if using multi-process, make sure not passing these objects directly.
+    '''
     def __init__(self, data_dicts: "list[LoomDataDict]"):
+        super().__init__()
         assert parallel.is_initialized(), "One must init `LoomTrainer` before init `LoomDataModule`"
 
         self.data_dicts = data_dicts
@@ -67,6 +82,7 @@ class LoomDataModule(CheckpointMixin):
         return self.global_step % self.strategy.data_config.val_interval == 0
 
     def connect_strategy(self, strategy: "DataStrategy"):
+        '''Must be called before module.connect_datamodule, because self.train_data_iter not setup'''
         assert isinstance(strategy, DataStrategy)
         self.strategy = strategy
         self.strategy.config_loomDataModule_method(self)
@@ -85,7 +101,13 @@ class LoomDataModule(CheckpointMixin):
 
     @property
     def exhausted(self) -> bool:
-        self.train_data_iter.exhausted
+        return self.train_data_iter.exhausted
+    
+    @property
+    def training_epoch(self) -> int:
+        return self.train_data_iter.current_epoch
+
+
 
     @property
     def training(self):
@@ -120,7 +142,7 @@ class LoomDataModule(CheckpointMixin):
     def dataset_collate_fn(dataset: "CollateDataset", self: "LoomDataModule", item_list):
         raise NotImplementedError
 
-    @classmethod
+    @staticmethod
     def datasetmethod(func: Callable) -> Callable:
         '''
         Functions decorated by this decorator will be replaced as the method of CollateDataset
@@ -147,6 +169,8 @@ class LoomDataModule(CheckpointMixin):
     def _apply_inject(self, datamodule, dataset: "CollateDataset") -> None:
         target_cls = dataset.__class__
         for name in dir(datamodule):
+            if name in ["exhausted", "total_train_steps", "total_val_steps"]:
+                continue # These are not initialized yet.
             attr = getattr(datamodule, name)
             if hasattr(attr, '_is_injectable_'):
                 original_func = attr._original_func_
@@ -164,17 +188,18 @@ class LoomDataModule(CheckpointMixin):
             data_dict.build_tokenizer()
             raw_dataset = getattr(self, f"load_raw_{dtype}_dataset")(data_dict)
             collate_dataset = CollateDataset()
-            collate_dataset.initialize = partial(LoomDataModule.dataset_initialize, collate_dataset, self, raw_dataset, data_dict)
-            collate_dataset.__len__ = partial(LoomDataModule.dataset_len, collate_dataset, self)
-            collate_dataset.__getitem__ = partial(LoomDataModule.dataset_getitem, collate_dataset, self)
+            collate_dataset.initialize = partial(self.__class__.dataset_initialize, collate_dataset, self, raw_dataset, data_dict)
+            collate_dataset.dataset_len = partial(self.__class__.dataset_len, collate_dataset, self)
+            collate_dataset.dataset_getitem = partial(self.__class__.dataset_getitem, collate_dataset, self)
             self._apply_inject(self, collate_dataset)
             collate_dataset.initialize()
             collate_datasets += [collate_dataset]
-            sample_ratios += [data_dict.ratio]
-            sample_counts += [data_dict.count]
-        # TODO: when data_dict.count is None, exception will be raised.
+            sample_ratios += [getattr(data_dict, f"{dtype}_ratio")]
+            sample_counts += [getattr(data_dict, f"{dtype}_count")]
+
+        if None in sample_counts: sample_counts = None
         blended_dataset = BlendedDataset(collate_datasets, sample_ratios, sample_counts)
-        blended_dataset.collate_fn = partial(LoomDataModule.dataset_collate_fn, collate_datasets[0], self)
+        blended_dataset.collate_fn = partial(self.__class__.dataset_collate_fn, collate_datasets[0], self)
         
         return blended_dataset
 
@@ -190,11 +215,30 @@ class LoomDataModule(CheckpointMixin):
     def _setup_val_data_iter(self):
         self.val_data_iter = self.strategy.setup_data_iter(self.val_dataset)
 
-    def _update(self):
-        batches = super()._update()
-        return self.to_current_device(batches)
 
     def get_saved_sub_dir(self): return "data_iter"
 
+
+    def load_ckpt(self, saved_dir, tag):
+        self.consumed_samples = 0
+        self.consumed_epoch = 0
+        if IO.exists(saved_dir) and IO.exists(path_join(saved_dir, "states.json")):
+            states = read_json(path_join(saved_dir, "states.json"))
+            self.consumed_samples = states["consumed_samples"]
+            self.consumed_epoch = states['consumed_epoch']
+        
+        self.train_data_iter.set_state(consumed_epoch = self.consumed_epoch, 
+                                       consumed_samples = self.consumed_samples)
+        
+
+    def save_ckpt(self, save_dir, tag): 
+        save_json(self.train_data_iter.get_state()), path_join(save_dir, "states.json")
+
+
+
     def update(self):
-        return next(self.train_data_iter)
+        # TODO: if pipeline-parallelism, global batch will not be generated simultaneously.
+        times = self.strategy.data_config.grad_accum
+        while times and (not self.exhausted):
+            times -= 1
+            yield self.to_current_device(next(self.train_data_iter))
