@@ -1,6 +1,7 @@
 from typing import Iterable
 import torch.utils.data as tud
 from loomtrain.core.data.dataset.base import CollateDataset
+from loomtrain.core.data.distributed_sampler import *
 
 
 class LoomDataIter(tud.DataLoader):
@@ -8,9 +9,9 @@ class LoomDataIter(tud.DataLoader):
                  dataset: "CollateDataset",
                  batch_size: "int" = 1,
                  num_epochs: "int" = 1,
-                 shuffle: "bool" | "None" = None, 
-                 sampler: "Iterable" | "None" = None,
-                 batch_sampler: "Iterable" | "None" = None,
+                 shuffle: "bool | None" = None, 
+                 sampler: "Iterable | None" = None,
+                 batch_sampler: "Iterable | None" = None,
                  num_workers: "int" = 0,
                  pin_memory: "bool" = False,
                  drop_last: "bool" = False,
@@ -28,6 +29,7 @@ class LoomDataIter(tud.DataLoader):
         )
 
         self.num_epochs = num_epochs
+        self._current_epoch = 0
         self._exhausted = False
 
         self.data_iter = iter(self)
@@ -36,6 +38,11 @@ class LoomDataIter(tud.DataLoader):
     @property
     def exhausted(self):
         return self._exhausted
+    
+
+    @property
+    def current_epoch(self):
+        return self._current_epoch
 
     def __next__(self):
         current_batch = self.next_batch
@@ -45,5 +52,17 @@ class LoomDataIter(tud.DataLoader):
 
 
     def __iter__(self):
-        for _ in range(self.num_epochs):
+        for epoch in range(self.num_epochs):
+            self._current_epoch = epoch
+            if epoch < self.start_epoch:continue
+            self.load_sampler_state(epoch, self.start_epoch)
             yield from iter(super().__iter__())
+    
+
+    def set_state(self, start_epoch: int, consumed_samples = 0):
+        self.start_epoch = start_epoch
+        self.consumed_samples = consumed_samples
+    
+
+    def get_state(self) -> dict:
+        ...

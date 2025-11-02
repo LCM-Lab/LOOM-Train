@@ -58,9 +58,7 @@ def set_cu_seqlens_for_ring_attn(
         ring_attn_group
     )
 
-    return dict(sequences = sequences, 
-                attention_mask = attention_mask, 
-                position_ids = position_ids)
+    return sequences, attention_mask, position_ids
 
 
 
@@ -71,7 +69,7 @@ class RingFlashAttnPlugin(parallel.ParallelPlugin, ContextParallel):
         substitute_hf_flash_attn(ring_attn_group, head_stride)
         
         parallel.prepare_cp_input = partial(
-            substitute_hf_flash_attn, ring_attn_group = ring_attn_group
+            set_cu_seqlens_for_ring_attn, ring_attn_group = ring_attn_group
         )
 
 

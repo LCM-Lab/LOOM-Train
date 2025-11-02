@@ -1,14 +1,13 @@
 import bisect, random
-from typing import List
 from loomtrain.core.data.dataset.base import CollateDataset
 
     
 
 class BlendedDataset(CollateDataset):
     def __init__(self, 
-                 datasets: List[CollateDataset],
-                 sample_ratios: List[float] = None,
-                 sample_counts: List[int] = None,
+                 datasets: "list[CollateDataset]",
+                 sample_ratios: "list[float]" = None,
+                 sample_counts: "list[int]" = None,
                  random_seed: int = 42):   
         if sample_ratios is None:
             sample_ratios = [1] * len(datasets)

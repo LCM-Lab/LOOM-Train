@@ -16,8 +16,9 @@ from dataclasses import dataclass
 
 
 class LoomModule(CheckpointMixin):
-    def __init__(self, opt_dicts: "list[LoomOptDict]" | "dict[str, LoomOptDict]" = None, actor_groups: "list[LoomActorGroup]" | "dict[str, LoomActorGroup]" = None):        
+    def __init__(self, opt_dicts: "list[LoomOptDict] | dict[str, LoomOptDict]" = None, actor_groups: "list[LoomActorGroup] | dict[str, LoomActorGroup]" = None):        
         assert parallel.is_initialized(), "One must init `LoomTrainer` before init `LoomModule`"
+        super().__init__()
 
         if isinstance(opt_dicts, list):
             opt_dicts = {f"model_{str(i)}": dic for i, dic in enumerate(opt_dicts)}
@@ -31,7 +32,7 @@ class LoomModule(CheckpointMixin):
 
     def _validate(self, datamodule: "LoomDataModule"):
         logs_dict = dict()
-        if datamodule.is_validating_step():
+        if datamodule.is_validating_step:
             self.eval()
             datamodule.eval()
             datamodule._setup_val_data_iter()
@@ -58,7 +59,7 @@ class LoomModule(CheckpointMixin):
         for group in self.opt_dicts.values():
             group.total_steps = datamodule.total_train_steps
             if is_first_group:
-                if not datamodule.train_dataset.tokenizer_name:
+                if not getattr(datamodule.train_dataset, "tokenizer_name", None):
                     datamodule.train_dataset.tokenizer_name = group.tokenizer_name
                     datamodule.val_dataset.tokenizer_name = group.tokenizer_name
                 is_first_group = False
@@ -102,6 +103,7 @@ class LoomModule(CheckpointMixin):
     def _setup_actors(self, opt_groups: "dict[str, LoomActorGroup]") -> "dict[str, LoomActorGroup]":
         for group in opt_groups.values():
             group.build_actor()
+        return opt_groups
 
     def setup_self_module(self):
         '''this function will be called after all LoomActorGroups have be setup.'''
@@ -193,8 +195,8 @@ class LoomModule(CheckpointMixin):
     def update(self, batches):
         '''logic that forward/backward a whole batch then update parameters'''
         train_logs_dict = self.forward_backward(batches)
-        self.step(self.opt_groups)
-        self.zero_grad(self.opt_groups)
+        self.step()
+        self.zero_grad()
         train_logs_dict.update(self.non_accum_logs_per_step())
         
         return train_logs_dict

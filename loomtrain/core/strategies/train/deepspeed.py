@@ -13,7 +13,7 @@ from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 from peft import get_peft_model_state_dict, get_peft_model, PeftModel
 # from loomtrain.strategy.base import Strategy
-
+from loomtrain.core.utils import basename, dirname, save_json
 from loomtrain.core.strategy import TrainStrategy
 from loomtrain.core.parallel import parallel_state as parallel
 from loomtrain.core.utils.init_hf import init_model, init_tokenizer
@@ -27,7 +27,7 @@ from loomtrain.core.actor import LoomOptDict, LoomActorGroup
 @dataclass
 class DeepspeedConfig:
     zero_stage: Literal[2, 3] = 2,
-    enable_bf16     : bool = True,
+    enable_bf16     : bool = True
     offload         : bool = False
     adam_offload    : bool = False
     ref_offload     : bool = False # reference model offload
@@ -69,20 +69,21 @@ class DeepspeedStrategy(TrainStrategy):
 
         built_dict = dict()
 
-        for name, actor_dict in opt_dicts.items():
-            model = init_model(actor_dict.model_name, model_type = actor_dict.model_type)
-            tokenizer = init_tokenizer(actor_dict.tokenizer_name)
+        for name, opt_dict in opt_dicts.items():
+            model = init_model(opt_dict.model_name, model_type = opt_dict.model_type)
+            tokenizer = init_tokenizer(opt_dict.tokenizer_name)
             AdamOptimizer = DeepSpeedCPUAdam if self.config.adam_offload else FusedAdam
-            optim_params = optimizer_grouped_parameters(model, actor_dict.weight_decay)
-            optimizer = AdamOptimizer(optim_params, **actor_dict.pop('model'))
+            optim_params = optimizer_grouped_parameters(model, opt_dict.L2_weight_decay)
+            
+            optimizer = AdamOptimizer(optim_params, lr = opt_dict.lr, betas = opt_dict.betas, weight_decay = opt_dict.L2_weight_decay)
 
             scheduler = get_scheduler(
-                name = actor_dict.lr_type,
+                name = opt_dict.lr_type,
                 optimizer = optimizer,
-                num_warmup_steps = actor_dict.num_warmup_steps,
-                num_training_steps = actor_dict.total_steps,
-                scheduler_specific_kwargs = dict(min_lr = actor_dict.lr * 0.1 \
-                    if actor_dict.min_lr is None else actor_dict.min_lr)
+                num_warmup_steps = opt_dict.num_warmup_steps,
+                num_training_steps = opt_dict.total_steps,
+                scheduler_specific_kwargs = dict(min_lr = opt_dict.lr * 0.1 \
+                    if opt_dict.min_lr is None else opt_dict.min_lr)
             )
             model, optimizer, scheduler = self._prepare_train(
                 model, optimizer, scheduler
@@ -93,8 +94,8 @@ class DeepspeedStrategy(TrainStrategy):
                 tokenizer = tokenizer,
                 optimizer = optimizer,
                 scheduler = scheduler,
-                actor_type = actor_dict.actor_type,
-                loss_type = actor_dict.loss_type
+                actor_type = opt_dict.model_type,
+                loss_type = opt_dict.loss_type
             )
 
         return built_dict
@@ -131,8 +132,8 @@ class DeepspeedStrategy(TrainStrategy):
                         stage = self.config.zero_stage,
                         enable_bf16 = self.config.enable_bf16,
                         # train_batch_size = self.config.train_batch_size,
-                        gradient_accumulation_steps = self.accumulated_gradient,
-                        train_micro_batch_size_per_gpu = self.config.train_micro_batch_size_per_gpu,
+                        gradient_accumulation_steps = self.data_config.grad_accum,
+                        train_micro_batch_size_per_gpu = self.data_config.micro_batch_size,
                         grad_clip = self.config.grad_clip,
                         zpg = self.config.zpg,
                         grad_accum_dtype = self.config.grad_accum_dtype,
@@ -145,7 +146,7 @@ class DeepspeedStrategy(TrainStrategy):
 
         if self.config.torch_compile: engine.compile()
 
-        return model, optimizer, scheduler
+        return engine, optimizer, scheduler
     
 
     def loomModule_save_ckpt(self, save_dir: str, tag: str):
@@ -158,8 +159,9 @@ class DeepspeedStrategy(TrainStrategy):
 
     def loomModule_load_ckpt(self, saved_dir: str, tag: str):
         for name, group in self.opt_groups.items():
+            assert isinstance(group.model, deepspeed.DeepSpeedEngine)
             group.model.load_checkpoint(
-                load_dir = saved_dir,
+                load_dir = os.path.join(saved_dir, name),
                 tag = tag,
                 load_module_strict = True,
                 load_optimizer_states = True,
@@ -189,8 +191,13 @@ class DeepspeedStrategy(TrainStrategy):
             gathered_state_dict = dict()
             actor = group.actor
             model_to_save = actor.model
+            assert isinstance(model_to_save, deepspeed.DeepSpeedEngine)
+            
+            if hasattr(model_to_save, "module"):
+                model_to_save = model_to_save.module
 
-            csave_dir = os.path.join(save_dir, name)
+
+            csave_dir = os.path.join(dirname(save_dir), name, basename(save_dir))
 
             for k, v in model_to_save.named_parameters():
 
@@ -221,7 +228,7 @@ class DeepspeedStrategy(TrainStrategy):
                         cloned.load_state_dict(model_to_save.state_dict(), strict=True)
                         model_to_save = cloned
 
-
+                    #TODO Lora
                     if self.lora_config.save_merged:
                         model_to_save = model_to_save.merge_and_unload()
                         model_to_save.save_pretrained(csave_dir, )

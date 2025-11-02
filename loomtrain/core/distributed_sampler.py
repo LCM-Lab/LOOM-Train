@@ -6,8 +6,9 @@ import torch.distributed as dist
 import torch.utils.data as tud
 from torch.utils.data.dataset import Dataset
 from torch.utils.data.sampler import Sampler
-from loomtrain.utils.common.tools import bucketize
-from loomtrain.dataset.sft import SFTDataset
+from loomtrain.core.utils.common.tools import bucketize
+from loomtrain.core.data.dataset import CollateDataset
+from loomtrain.core import parallel
 
 __all__ = ["DistributedSampler", "DistributedBucketSampler"]
 
@@ -79,11 +80,11 @@ class DistributedSampler(Sampler[_T_co]):
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
-            num_replicas = dist.get_world_size()
+            num_replicas = parallel.get_dp_size()
         if rank is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
-            rank = dist.get_rank()
+            rank = parallel.get_dp_rank()
         if rank >= num_replicas or rank < 0:
             raise ValueError(f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}]")
         self.dataset = dataset
@@ -159,7 +160,7 @@ class DistributedSampler(Sampler[_T_co]):
 class DistributedBucketSampler(Sampler[_T_co]):
     def __init__(
         self,
-        dataset: SFTDataset,
+        dataset: CollateDataset,
         bucket_size: int, 
         num_replicas: Optional[int] = None,
         rank: Optional[int] = None,
@@ -173,11 +174,11 @@ class DistributedBucketSampler(Sampler[_T_co]):
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
-            num_replicas = dist.get_world_size()
+            num_replicas = parallel.get_dp_size()
         if rank is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
-            rank = dist.get_rank()
+            rank = parallel.get_dp_rank()
         if rank >= num_replicas or rank < 0:
             raise ValueError(f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}]")
         self.dataset = dataset

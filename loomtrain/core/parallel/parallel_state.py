@@ -1,26 +1,19 @@
 from typing import Literal, List
-from dataclasses import dataclass
+from dataclasses import dataclass, field 
 import torch
 import torch.distributed as dist
-from loomtrain.core.device.mesh import DeviceMesh
 
 @dataclass
 class ParallelConfig:
-    train_batch_size: int = 1
-    micro_batch_size: int = 1
-    val_batch_size: int = 1
     nnodes: int = 1
     devices_per_node: int = 8
     cp:int = 8
     pp:int = 1
     sp:int = 1
     tp:int = 1
-    cp_args: dict = dict( type = "ring", head_stride = 1)
+    cp_type: Literal["ring"] = "ring"
+    cp_args: "dict" = field(default_factory = lambda: dict(head_stride = 1))
     order = ("tp", "sp", "cp", "pp", "dp")
-
-    @property
-    def grad_accum(self):
-        return self.train_batch_size * self.cp // self.micro_batch_size // self.expected_world_size
 
     @property
     def shape(self):
@@ -244,11 +237,11 @@ def set_sp_size(size: int):
     global _SP_WORLD_SIZE_ 
     _SP_WORLD_SIZE_ = size
 
-def set_tp_rank(size: int):
+def set_tp_size(size: int):
     global _TP_WORLD_SIZE_ 
     _TP_WORLD_SIZE_ = size
 
-def set_pp_rank(size: int):
+def set_pp_size(size: int):
     global _PP_WORLD_SIZE_ 
     _PP_WORLD_SIZE_ = size
 
@@ -325,6 +318,7 @@ def init_distributed(backend: str = "nccl"):
 
 
 def initialize(parallel_config: "ParallelConfig"):
+    from loomtrain.core.device.mesh import DeviceMesh
     device_mesh = DeviceMesh(parallel_config)
 
     rank = dist.get_rank()
@@ -349,7 +343,7 @@ def initialize(parallel_config: "ParallelConfig"):
     set_initialized()
 
 def _init_parallel_plugins(parallel_config: "ParallelConfig"):
-    if parallel_config.cp_args['type'] == "ring":
+    if parallel_config.cp_type == "ring":
         from loomtrain.core.parallel.context_parallel.ring import RingFlashAttnPlugin
         RingFlashAttnPlugin().initialize(** parallel_config.cp_args)
     ... #TODO other parallel type

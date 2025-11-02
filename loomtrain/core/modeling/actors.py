@@ -8,15 +8,13 @@ from transformers.modeling_outputs import (
     SequenceClassifierOutputWithPast
 )
 
-from loomtrain.core.actor import (
-    LoomActor
-)
+
 from loomtrain.core.parallel import parallel_state as parallel
 from loomtrain.core.modeling.customs.rm_modeling import train_forwards
 
 
 def get_actor_cls(actor_type: Literal["causal", "classifier"] = "causal", 
-                  collate_type: Literal["packing", "padding"] = "packing") -> "PackingGPT" | "PackingRM":
+                  collate_type: Literal["packing", "padding"] = "packing") -> "PackingGPT | PackingRM":
     if (actor_type, collate_type) == ("causal", "packing"):
         return PackingGPT
     
@@ -34,10 +32,10 @@ class Actor(nn.Module):
 
 class PackingGPT(Actor):
     def forward(self, 
-                sequeces: "torch.LongTensor",
+                sequences: "torch.LongTensor",
                 seq_lens: "Optional[list[int]]" = None,
                 attention_mask: "Optional[torch.BoolTensor]" = None):
-        inputs = parallel.prepare_cp_input(sequeces = sequeces, 
+        inputs = parallel.prepare_cp_input(packed_sequences = sequences, 
         seq_lens = seq_lens, attention_mask = attention_mask)
         output = self.model(*inputs)
 
@@ -86,7 +84,7 @@ class PackingRM(Actor):
                 attention_mask: "Optional[torch.BoolTensor]" = None,
                 ):
 
-        inputs = parallel.prepare_cp_input(sequeces = sequences, 
+        inputs = parallel.prepare_cp_input(packed_sequences = sequences, 
         seq_lens = seq_lens, attention_mask = attention_mask)
         output = self.model(*inputs)
 

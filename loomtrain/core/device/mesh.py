@@ -10,7 +10,7 @@ from loomtrain.core.parallel.parallel_state import ParallelConfig
 class DeviceMesh:
     def __init__(
             self,
-            parallel_config: ParallelConfig = ParallelConfig()
+            parallel_config: "ParallelConfig" = ParallelConfig()
     ):
         assert torch.distributed.is_initialized(), \
             "You should initialize the distributed env before instantiate this class !"
