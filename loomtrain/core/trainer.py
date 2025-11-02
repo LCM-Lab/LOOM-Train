@@ -1,6 +1,3 @@
-from typing import Literal
-from dataclasses import dataclass
-from loomtrain.core._loop import _FitLoop
 from loomtrain.core.state import CheckpointConfig
 from loomtrain.core.strategy import TrainStrategy, DataStrategy
 from loomtrain.core.module import LoomModule
@@ -30,16 +27,16 @@ class LoomTrainer:
             vismodule: "VisualizationModule",
             checkpoint_config: "CheckpointConfig"):
         
-        module.connect_datamodule(datamodule)
         datamodule.connect_module(module)
-        module.connect_strategy(self.train_strategy)
         datamodule.connect_strategy(self.data_stretegy)
+        module.connect_datamodule(datamodule)
+        module.connect_strategy(self.train_strategy)
 
 
         if checkpoint_config.do_resume:
-            module._load_ckpt(saved_dir = checkpoint_config.save_dir)
-            datamodule._load_ckpt(saved_dir = checkpoint_config.save_dir)
-            vismodule._load_ckpt(saved_dir = checkpoint_config.save_dir)
+            module._load_ckpt(checkpoint_config)
+            datamodule._load_ckpt(checkpoint_config, inplace = True)
+            vismodule._load_ckpt(checkpoint_config, inplace = True)
 
         module.train()
         datamodule.train()
@@ -59,9 +56,9 @@ class LoomTrainer:
             
             vismodule._update(state_dict)
 
-            datamodule._save_ckpt(checkpoint_config)
+            datamodule._save_ckpt(checkpoint_config, inplace = True)
             module._save_ckpt(checkpoint_config)
-            vismodule._save_ckpt(checkpoint_config)
+            vismodule._save_ckpt(checkpoint_config, inplace = True)
 
             module._save_module(checkpoint_config) # save module weights for inference
 
