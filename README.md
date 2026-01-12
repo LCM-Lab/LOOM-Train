@@ -47,6 +47,12 @@ pip install ring_flash_attn
 
 ---
 
+## 🛠️ Getting Started
+Coming soon  ...
+```
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! Whether it’s bug fixes, new features, or documentation improvements — feel free to open an issue or PR.  
